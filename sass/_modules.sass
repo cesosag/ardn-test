@@ -1,0 +1,21 @@
+.gallery-item
+	cursor: pointer
+	flex-basis: 33%
+	position: relative
+
+	&:hover
+		.gallery-item-caption
+			opacity: 1
+
+.gallery-item-caption
+	align-items: center
+	background-color: rgba(0,0,0,.8)
+	bottom: 0
+	display: flex
+	left: 0
+	opacity: 0
+	position: absolute
+	justify-content: center
+	right: 0
+	transition: all 0.3s
+	top: 0
