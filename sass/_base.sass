@@ -28,7 +28,10 @@ button
 	text-transform: uppercase
 	transition: all 0.3s
 
-	&:hover
+	&:disabled
+		cursor: not-allowed
+
+	&:not(:disabled):hover
 		background-color: black
 		color: white
 
