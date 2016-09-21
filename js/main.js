@@ -4,6 +4,7 @@ $(function(){
 	var raw_data = [];
 	var images = [];
 	var frames = 0;
+	var tl = new TimelineMax();
 
 	// Get data from JSON file, when done, render first frame
 	$.get('data.json').done(function(data){
@@ -24,6 +25,21 @@ $(function(){
 		// Render initial data
 		$('#title').html(title);
 		renderFrame(images, 0, frames);
+
+		tl.from('#title', .3, {
+			autoAlpha: 0,
+			ease: Power1.easeIn,
+			x: -200,
+			y: -100
+		}).staggerFrom('.gallery-item', 10, {
+			bezier: [
+				{left:-300, top:-150, rotationY: 90, rotationX: 90, opacity: 0},
+				{left:-150, top:-50, rotationY: 0, rotationX: 0, opacity: 1},
+			],
+			//autoRotate: true,
+			//autoAlpha: 0,
+			ease:Power1.easeInOut
+		}, .3);
 	});
 
 	$('#main').on('click', '#pagination-next', function(){
