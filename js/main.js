@@ -40,35 +40,107 @@ $(function(){
 	});
 
 	// Navigation between frames using the buttons
-	$('#main').on('click', '#pagination-next', function(){
+	$('#main').on('click', '.pagination-button', function(){
 		var $button = $(this);
 		var current_frame = $button.data('current');
-		G.unrenderFrame(images, current_frame, frames);
-	});
-	$('#main').on('click', '#pagination-prev', function(){
-		var $button = $(this);
-		var current_frame = $button.data('current');
-		G.unrenderFrame(images, current_frame - 2, frames);
+		var next_frame = 0;
+		// Get button id, to asign what frame goes next
+		if($button[0].id == "pagination-next"){
+			next_frame = current_frame;
+		}
+		else if($button[0].id == "pagination-prev"){
+			next_frame = current_frame - 2;
+		}
+		G.unrenderFrame(images, next_frame, frames);
 	});
 
 	// Expanded view of a picture
-	$('#main').on('click', '.gallery-item', function(){
-		var $image = $(this);
-		var position = $image.offset();
-		var width = $image.innerWidth();
+	$('#main').on('click', '.gallery-item', G.expandImage);
+	$('#main').on('click', '.gallery-item .close', G.closeImage);
+});
+
+// Functions encapsulation
+G = new (function(){
+	var self = this;
+	this.imgTemplate = function(src, caption){
+		return '<figure class="gallery-item"><button type="button" class="close">X</button><img src="'+src+'" alt="" class="gallery-item-img"><figcaption class="gallery-item-caption">'+caption+'</figcaption></figure>';
+	}
+	this.renderFrame = function(images, frame, frames){
+		var figures = "";
+		var tl = new TimelineMax();
+
+		// Get the images of the desired frame, and place them into image template
+		images[frame].forEach(function(item){
+			figures += self.imgTemplate(item.src, item.caption);
+		});
+		// Place the images into the gallery
+		$('#gallery').html(figures);
+		// Staggered animation of the pictures using a bezier path
+		tl.staggerTo('.gallery-item', 1, {
+			bezier: { 
+				values: [
+					{x: -300, y: -150, rotationY: 0, rotationX: -90, scaleX: 0.5, scaleY: 0.5, opacity: 0},
+					{x: -600, y: -100, rotationY: 45, rotationX: -67.5, scaleX: 2, scaleY: 2, opacity: 0.3},
+					{x: -150, y: 50, rotationY: 22.5, rotationX: -45, scaleX: 1.1, scaleY: 1.1, opacity: 0.8},
+					{x: 0, y: 0, rotationY: 0, rotationX: 0, scaleX: 1, scaleY: 1, opacity: 1},
+				]
+			},
+			ease:Power1.easeInOut
+		}, -0.3);
+		// Update the pagination counter
+		$('#counter').html((1+frame)+"/" + frames);
+		// Update the current frame data in buttons
+		$('#buttons .pagination-button').data('current', frame + 1);
+		// Disable or enabe buttons according to pagination edges
+		if(frame + 1 == frames){
+			$('#pagination-prev').prop('disabled', false);
+			$('#pagination-next').prop('disabled', true);
+		}
+		else if(frame + 1 == 1){
+			$('#pagination-prev').prop('disabled', true);
+			$('#pagination-next').prop('disabled', false);
+		}
+		else{
+			$('#buttons .pagination-button').prop('disabled', false);
+		}
+	}
+	this.unrenderFrame = function(images, frame, frames){
+		var tl = new TimelineMax({
+			// When complete, render next frame
+			onComplete: function(){
+				self.renderFrame(images, frame, frames);
+			}
+		});
+		// Taking out the pictures of the current frame
+		tl.staggerTo('.gallery-item', .5, {
+			bezier: {
+				values: [
+					{x: 0, y: 0, rotationY: 0, rotationX: 0, scaleX: 1, scaleY: 1, opacity: 1},
+					{x: -150, y: 50, rotationY: -22.5, rotationX: 45, scaleX: 1.1, scaleY: 0.5, opacity: 0.8},
+					{x: -600, y: -100, rotationY: -45, rotationX: 67.5, scaleX: 2, scaleY: 1.1, opacity: 0.3},
+					{x: -300, y: -150, rotationY: 0, rotationX: 90, scaleX: 0.5, scaleY: 2, opacity: 0}
+				]
+			},
+			ease:Power1.easeInOut
+		}, .3);
+	}
+	this.expandImage = function(){
+		var $image = $(this);	// Get original image
+		var position = $image.offset();	// Get global position of the selected image
+		var width = $image.innerWidth(); // Get actual size, width and height of the selected image
 		var height = $image.innerHeight();
-		var $clone = $image.clone();
+		var $clone = $image.clone();	// Clone the selected image, so it won't change layout when animating 'it'
 		$image.addClass('cloned');
+		// Positioning the cloned image over the original one
 		$clone.addClass('clone').css({
-			//bottom: position.top + height,
-			//right: position.left + width,
 			position: 'fixed',
 			top: position.top,
 			left: position.left,
 			height: height,
 			width: width
 		});
-		$('#main').append($clone)
+		$('#main').append($clone);	// Placing the cloned image in the exact absolute position over the original one
+		// Animating the cloned image to expanded state
 		TweenMax.to($clone, .5, {
 			className: '+=is-expanded',
 			top: 0,
@@ -79,14 +151,15 @@ $(function(){
 			width: "100vw",
 			ease: Bounce.easeOut
 		});
-	});
-	$('#main').on('click', '.gallery-item .close', function(e){
-		e.stopPropagation();
-		var $original = $('.cloned');
-		var original_position = $original.offset();
+	}
+	this.closeImage = function(e){
+		e.stopPropagation();	// Prevent expandImage function from being called
+		var $original = $('.cloned');	// Get original image
+		var original_position = $original.offset();	//Get original position and size
 		var original_width = $original.innerWidth();
 		var original_height = $original.innerHeight();
-		var $clone = $(this).parent();
+		var $clone = $(this).parent();	// Get the cloned image
+		// Animating the cloned expanded image to a non expanded state, and removing it from DOM when complete
 		TweenMax.to($clone, .5, {
 			className: '-=is-expanded',
 			top: original_position.top,
@@ -96,68 +169,8 @@ $(function(){
 			ease: Bounce.easeOut,
 			onComplete: function(){
 				$original.removeClass('cloned');
-				setTimeout(function(){
-					$('.clone').remove();
-				}, 1000);
+				$('.clone').remove();
 			}
 		});
-	});
-});
-
-// Functions encapsulation
-G = new (function(){
-	var self = this;
-	this.imgTemplate = function(id, src, caption){
-		return '<figure id="'+id+'" class="gallery-item"><button type="button" class="close">X</button><img src="'+src+'" alt="" class="gallery-item-img"><figcaption class="gallery-item-caption">'+caption+'</figcaption></figure>';
-	}
-	this.prevButton = function(current_frame, disabled){
-		var is_disabled = (disabled ? " disabled" : "");
-		return '<button type="button" id="pagination-prev" class="pagination-button" data-current="'+current_frame+'"'+is_disabled+'>Fotos anteriores</button>';
-	}
-	this.nextButton = function(current_frame, disabled){
-		var is_disabled = (disabled ? " disabled" : "");
-		return '<button type="button" id="pagination-next" class="pagination-button" data-current="'+current_frame+'"'+is_disabled+'>Fotos siguientes</button>';
-	}
-	this.renderFrame = function(images, frame, frames){
-		var figures = "";
-		var tl = new TimelineMax();
-
-		images[frame].forEach(function(item, index){
-			figures += self.imgTemplate('img-' + index, item.src, item.caption);
-		});
-		$('#gallery').html(figures);
-		tl.staggerTo('.gallery-item', .5, {
-			bezier: [
-				{x:-300, y:-150, rotationY: 90, rotationX: 90, opacity: 0},
-				{x:-150, y:-50, rotationY: 45, rotationX: 45, opacity: 0.3},
-				{x:0, y:0, rotationY: 0, rotationX: 0, opacity: 1},
-			],
-			ease:Power1.easeInOut
-		}, -0.3);
-		$('#counter').html((1+frame)+"/" + frames);
-		if(frame + 1 == frames){
-			$('#buttons').html(self.prevButton(frame + 1, false) + self.nextButton(frame + 1, true));
-		}
-		else if(frame + 1 == 1){
-			$('#buttons').html(self.prevButton(frame + 1, true) + self.nextButton(frame + 1, false));
-		}
-		else{
-			$('#buttons').html(self.prevButton(frame + 1, false) + self.nextButton(frame + 1, false));
-		}
-	}
-	this.unrenderFrame = function(images, frame, frames){
-		var tl = new TimelineMax({
-			onComplete: function(){
-				self.renderFrame(images, frame, frames);
-			}
-		});
-		tl.staggerTo('.gallery-item', .5, {
-			bezier: [
-				{x:0, y:0, rotationY: 0, rotationX: 0, opacity: 1},
-				{x:-150, y:-50, rotationY: 45, rotationX: 45, opacity: 0.3},
-				{x:-300, y:-150, rotationY: 90, rotationX: 90, opacity: 0},
-			],
-			ease:Power1.easeInOut
-		}, .3);
 	}
 });
