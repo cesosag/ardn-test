@@ -4,7 +4,6 @@ $(function(){
 	var raw_data = [];
 	var images = [];
 	var frames = 0;
-	var tl = new TimelineMax();
 
 	// Get data from JSON file, when done, render first frame
 	$.get('data.json').done(function(data){
@@ -24,64 +23,141 @@ $(function(){
 
 		// Render initial data
 		$('#title').html(title);
-		renderFrame(images, 0, frames);
-
-		tl.from('#title', .3, {
+		TweenMax.from('#title', .3, {
 			autoAlpha: 0,
 			ease: Power1.easeIn,
 			x: -200,
 			y: -100
-		}).staggerFrom('.gallery-item', 10, {
-			bezier: [
-				{left:-300, top:-150, rotationY: 90, rotationX: 90, opacity: 0},
-				{left:-150, top:-50, rotationY: 0, rotationX: 0, opacity: 1},
-			],
-			//autoRotate: true,
-			//autoAlpha: 0,
-			ease:Power1.easeInOut
-		}, .3);
+		});
+		G.renderFrame(images, 0, frames);
+		TweenMax.from('#pagination', .3, {
+			autoAlpha: 0,
+			delay: 2,
+			ease: Power1.easeIn,
+			x: 200,
+			y: 100
+		});
 	});
 
+	// Navigation between frames using the buttons
 	$('#main').on('click', '#pagination-next', function(){
 		var $button = $(this);
 		var current_frame = $button.data('current');
-		renderFrame(images, current_frame, frames);
+		G.unrenderFrame(images, current_frame, frames);
 	});
 	$('#main').on('click', '#pagination-prev', function(){
 		var $button = $(this);
 		var current_frame = $button.data('current');
-		renderFrame(images, current_frame - 2, frames);
+		G.unrenderFrame(images, current_frame - 2, frames);
+	});
+
+	// Expanded view of a picture
+	$('#main').on('click', '.gallery-item', function(){
+		var $image = $(this);
+		var position = $image.offset();
+		var width = $image.innerWidth();
+		var height = $image.innerHeight();
+		var $clone = $image.clone();
+		$image.addClass('cloned');
+		$clone.addClass('clone').css({
+			//bottom: position.top + height,
+			//right: position.left + width,
+			position: 'fixed',
+			top: position.top,
+			left: position.left,
+			height: height,
+			width: width
+		});
+		$('#main').append($clone)
+		TweenMax.to($clone, .5, {
+			className: '+=is-expanded',
+			top: 0,
+			left: 0,
+			bottom: 0,
+			right: 0,
+			height: "100vh",
+			width: "100vw",
+			ease: Bounce.easeOut
+		});
+	});
+	$('#main').on('click', '.gallery-item .close', function(e){
+		e.stopPropagation();
+		var $original = $('.cloned');
+		var original_position = $original.offset();
+		var original_width = $original.innerWidth();
+		var original_height = $original.innerHeight();
+		var $clone = $(this).parent();
+		TweenMax.to($clone, .5, {
+			className: '-=is-expanded',
+			top: original_position.top,
+			left: original_position.left,
+			height: original_height,
+			width: original_width,
+			ease: Bounce.easeOut,
+			onComplete: function(){
+				$original.removeClass('cloned');
+				setTimeout(function(){
+					$('.clone').remove();
+				}, 1000);
+			}
+		});
 	});
 });
 
-var imgTemplate = function(id, src, caption){
-	return '<figure id="'+id+'" class="gallery-item"><img src="'+src+'" alt="" class="gallery-item-img"><figcaption class="gallery-item-caption">'+caption+'</figcaption></figure>';
-}
-
-var prevButton = function(current_frame, disabled){
-	var is_disabled = (disabled ? " disabled" : "");
-	return '<button type="button" id="pagination-prev" class="pagination-button" data-current="'+current_frame+'"'+is_disabled+'>Fotos anteriores</button>';
-}
-
-var nextButton = function(current_frame, disabled){
-	var is_disabled = (disabled ? " disabled" : "");
-	return '<button type="button" id="pagination-next" class="pagination-button" data-current="'+current_frame+'"'+is_disabled+'>Fotos siguientes</button>';
-}
-
-var renderFrame = function(images, frame, frames){
-	var figures = "";
-	images[frame].forEach(function(item, index){
-		figures += imgTemplate('img-' + index, item.src, item.caption);
-	});
-	$('#gallery').html(figures);
-	$('#counter').html((1+frame)+"/" + frames);
-	if(frame + 1 == frames){
-		$('#buttons').html(prevButton(frame + 1, false) + nextButton(frame + 1, true));
+// Functions encapsulation
+G = new (function(){
+	var self = this;
+	this.imgTemplate = function(id, src, caption){
+		return '<figure id="'+id+'" class="gallery-item"><button type="button" class="close">X</button><img src="'+src+'" alt="" class="gallery-item-img"><figcaption class="gallery-item-caption">'+caption+'</figcaption></figure>';
 	}
-	else if(frame + 1 == 1){
-		$('#buttons').html(prevButton(frame + 1, true) + nextButton(frame + 1, false));
+	this.prevButton = function(current_frame, disabled){
+		var is_disabled = (disabled ? " disabled" : "");
+		return '<button type="button" id="pagination-prev" class="pagination-button" data-current="'+current_frame+'"'+is_disabled+'>Fotos anteriores</button>';
 	}
-	else{
-		$('#buttons').html(prevButton(frame + 1, false) + nextButton(frame + 1, false));
+	this.nextButton = function(current_frame, disabled){
+		var is_disabled = (disabled ? " disabled" : "");
+		return '<button type="button" id="pagination-next" class="pagination-button" data-current="'+current_frame+'"'+is_disabled+'>Fotos siguientes</button>';
 	}
-}
+	this.renderFrame = function(images, frame, frames){
+		var figures = "";
+		var tl = new TimelineMax();
+
+		images[frame].forEach(function(item, index){
+			figures += self.imgTemplate('img-' + index, item.src, item.caption);
+		});
+		$('#gallery').html(figures);
+		tl.staggerTo('.gallery-item', .5, {
+			bezier: [
+				{x:-300, y:-150, rotationY: 90, rotationX: 90, opacity: 0},
+				{x:-150, y:-50, rotationY: 45, rotationX: 45, opacity: 0.3},
+				{x:0, y:0, rotationY: 0, rotationX: 0, opacity: 1},
+			],
+			ease:Power1.easeInOut
+		}, -0.3);
+		$('#counter').html((1+frame)+"/" + frames);
+		if(frame + 1 == frames){
+			$('#buttons').html(self.prevButton(frame + 1, false) + self.nextButton(frame + 1, true));
+		}
+		else if(frame + 1 == 1){
+			$('#buttons').html(self.prevButton(frame + 1, true) + self.nextButton(frame + 1, false));
+		}
+		else{
+			$('#buttons').html(self.prevButton(frame + 1, false) + self.nextButton(frame + 1, false));
+		}
+	}
+	this.unrenderFrame = function(images, frame, frames){
+		var tl = new TimelineMax({
+			onComplete: function(){
+				self.renderFrame(images, frame, frames);
+			}
+		});
+		tl.staggerTo('.gallery-item', .5, {
+			bezier: [
+				{x:0, y:0, rotationY: 0, rotationX: 0, opacity: 1},
+				{x:-150, y:-50, rotationY: 45, rotationX: 45, opacity: 0.3},
+				{x:-300, y:-150, rotationY: 90, rotationX: 90, opacity: 0},
+			],
+			ease:Power1.easeInOut
+		}, .3);
+	}
+});
